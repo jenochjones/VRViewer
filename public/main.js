@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 let scene, camera, renderer, controls;
 let currentModel = null;
@@ -10,8 +11,8 @@ let currentModel = null;
 function init() {
     // Get the viewer container
     const viewer = document.getElementById('viewer');
-    const width = viewer.clientWidth;
-    const height = viewer.clientHeight;
+    const width = viewer.clientWidth || window.innerWidth;
+    const height = viewer.clientHeight || window.innerHeight;
 
     // Create the scene
     scene = new THREE.Scene();
@@ -24,6 +25,7 @@ function init() {
     // Set up the renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
+    renderer.xr.enabled = true; // Enable WebXR
     viewer.appendChild(renderer.domElement);
 
     // Add ambient light
@@ -46,13 +48,16 @@ function init() {
 
     // Handle window resize
     window.addEventListener('resize', onWindowResize, false);
+
+    // Add Three.js's built-in VR button
+    document.body.appendChild(VRButton.createButton(renderer));
 }
 
 // Handle window resize to adjust camera and renderer
 function onWindowResize() {
     const viewer = document.getElementById('viewer');
-    const width = viewer.clientWidth;
-    const height = viewer.clientHeight;
+    const width = viewer.clientWidth || window.innerWidth;
+    const height = viewer.clientHeight || window.innerHeight;
 
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -105,7 +110,7 @@ function loadGLTF(file) {
         });
     };
 
-    // Read the GLTF file as ArrayBuffer
+    // Read the GLTF file as ArrayBuffer or Text
     if (file) {
         if (file.name.toLowerCase().endsWith('.glb')) {
             reader.readAsArrayBuffer(file);
@@ -154,9 +159,10 @@ function fitCameraToObject(camera, object, controls, offset = 1.25) {
 
 // Animation loop to render the scene
 function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+    renderer.setAnimationLoop(function() {
+        controls.update();
+        renderer.render(scene, camera);
+    });
 }
 
 // Set up event listeners and initialize the scene
