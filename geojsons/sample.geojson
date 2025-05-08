@@ -1,0 +1,38 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "name": "Example Building",
+          "height": 20
+        },
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [[[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "name": "Sensor Station",
+          "height": 10
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [30, 10]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "name": "Pipeline Route"
+        },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [[5, -10], [10, -5], [15, -10], [20, -5]]
+        }
+      }
+    ]
+  }
+  
