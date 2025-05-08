@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/webxr/VRButton.js';
-import { VRController } <script src="VRController.js"></script>
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x20232a);
