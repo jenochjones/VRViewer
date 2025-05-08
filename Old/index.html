@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D GLTF Viewer</title>
+
+    <!-- Link to your CSS (optional) -->
+    <link rel="stylesheet" href="public/stylesheet.css">
+
+    <!-- Import Map for Three.js and its addons -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
+      }
+    }
+    </script>
+
+    <!-- Main JavaScript Module -->
+    <script type="module" src="public/main.js"></script>
+
+</head>
+<body>
+    <header>
+        <h1>3D GLTF Viewer</h1>
+    </header>
+
+    <div id="controls">
+        <input type="file" id="gltf-upload" accept=".gltf, .glb, .bin, .jpg, .jpeg, .png, .bmp, .tif, .tiff" multiple />
+        <label for="gltf-upload">Upload GLTF Model and Resources</label>
+        <p style="font-size: 0.9em; color: #555;">Please upload the main <strong>.gltf</strong>/<strong>.glb</strong> file along with any <strong>.bin</strong> and texture image files.</p>
+    </div>
+
+    <div id="viewer" style="width: 100%; height: 80vh;">
+    </div>
+</body>
+</html>
