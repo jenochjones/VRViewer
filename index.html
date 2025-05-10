@@ -1,94 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>WebXR VR Room with Controllers</title>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
+<head>
+  <meta charset="UTF-8" />
+  <title>WebXR VR Room with Controllers</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.156.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
+      "vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
+      "controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { VRButton } from 'vrButton';
+  import { XRControllerModelFactory } from 'controllerFactory';
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x202030);
+
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 1, 3);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+
+  // Room (static)
+  const room = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 3, 6),
+    new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
+  );
+  room.position.y = -1.5;
+  scene.add(room);
+
+  // Create a group for movable scene objects
+  const sceneGroup = new THREE.Group();
+  scene.add(sceneGroup);
+
+  // Light
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+  light.position.set(0, 1, 0);
+  sceneGroup.add(light);
+
+  // Floating cube
+  const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  cube.position.set(0, 1.6, -1);
+  sceneGroup.add(cube);
+
+  // Controllers
+  const controller1 = renderer.xr.getController(0);
+  const controller2 = renderer.xr.getController(1);
+  scene.add(controller1, controller2);
+
+  const controllerModelFactory = new XRControllerModelFactory();
+  const controllerGrip1 = renderer.xr.getControllerGrip(0);
+  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+  scene.add(controllerGrip1);
+
+  const controllerGrip2 = renderer.xr.getControllerGrip(1);
+  controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+  scene.add(controllerGrip2);
+
+  // Grabbing state
+  let isGrabbing = false;
+  let lastControllerPos = new THREE.Vector3();
+  let initialDistance = null;
+  let initialScale = 1;
+
+  function onSqueezeStart(event) {
+    isGrabbing = true;
+    lastControllerPos.copy(event.target.position);
+  }
+
+  function onSqueezeEnd() {
+    isGrabbing = false;
+    initialDistance = null;
+  }
+
+  controller1.addEventListener('squeezestart', onSqueezeStart);
+  controller1.addEventListener('squeezeend', onSqueezeEnd);
+
+  controller2.addEventListener('squeezestart', onSqueezeStart);
+  controller2.addEventListener('squeezeend', onSqueezeEnd);
+
+  // Animation loop
+  renderer.setAnimationLoop(() => {
+    if (isGrabbing) {
+      const pos1 = controller1.position;
+      const pos2 = controller2.position;
+
+      // 1. Panning (drag)
+      const delta = new THREE.Vector3().subVectors(pos1, lastControllerPos);
+      sceneGroup.position.add(delta);
+      lastControllerPos.copy(pos1);
+
+      // 2. Zooming
+      const currentDistance = pos1.distanceTo(pos2);
+      if (initialDistance === null) {
+        initialDistance = currentDistance;
+        initialScale = sceneGroup.scale.x;
+      } else {
+        const scaleFactor = currentDistance / initialDistance;
+        const newScale = initialScale * scaleFactor;
+        sceneGroup.scale.setScalar(newScale);
       }
-      canvas {
-        display: block;
-      }
-    </style>
-  </head>
-  <body>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.156.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
-          "vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
-          "controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
-        }
-      }
-    </script>
-    <script type="module">
-      import * as THREE from 'three';
-      import { VRButton } from 'vrButton';
-      import { XRControllerModelFactory } from 'controllerFactory';
 
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x202030);
+      // 3. Rotation (based on vector between controllers)
+      const dir1 = new THREE.Vector3().subVectors(pos2, pos1).normalize();
+      const dir2 = new THREE.Vector3(1, 0, 0); // reference
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(dir2, dir1);
+      sceneGroup.setRotationFromQuaternion(quaternion);
+    }
 
-      const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 1, 3);
+    renderer.render(scene, camera);
+  });
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
-      document.body.appendChild(VRButton.createButton(renderer));
-
-      // Room box
-      const room = new THREE.Mesh(
-        new THREE.BoxGeometry(6, 3, 6),
-        new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
-      );
-	  room.position.y = -1.5;
-      scene.add(room);
-
-      // Light
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444);
-      light.position.set(0, 1, 0);
-      scene.add(light);
-
-      // Cube floating in front of the user
-      const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-      const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
-      const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-      cube.position.set(0, 1.6, -1);
-      scene.add(cube);
-
-      // Controllers
-      const controller1 = renderer.xr.getController(0);
-      scene.add(controller1);
-
-      const controller2 = renderer.xr.getController(1);
-      scene.add(controller2);
-
-      // Controller models
-      const controllerModelFactory = new XRControllerModelFactory();
-
-      const controllerGrip1 = renderer.xr.getControllerGrip(0);
-      controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-      scene.add(controllerGrip1);
-
-      const controllerGrip2 = renderer.xr.getControllerGrip(1);
-      controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-      scene.add(controllerGrip2);
-
-      // Animate
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-      });
-
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    </script>
-  </body>
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
 </html>
