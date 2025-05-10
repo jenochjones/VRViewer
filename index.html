@@ -1,93 +1,86 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <title>Hello WebXR!</title>
-
-  <!-- three.js -->
-  <script src="https://unpkg.com/three@0.126.0/build/three.js"></script>
-</head>
-<body>
-
-<!-- Starting an immersive WebXR session requires user interaction.
-    We start this one with a simple button. -->
-<button onclick="activateXR()">Start Hello WebXR</button>
-<script>
-async function activateXR() {
-  // Add a canvas element and initialize a WebGL context that is compatible with WebXR.
-  const canvas = document.createElement("canvas");
-  document.body.appendChild(canvas);
-  const gl = canvas.getContext("webgl", {xrCompatible: true});
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0000ff); // Set blue background
-
-  // The cube will have a different color on each side.
-  const materials = [
-    new THREE.MeshBasicMaterial({color: 0xff0000}),
-    new THREE.MeshBasicMaterial({color: 0x0000ff}),
-    new THREE.MeshBasicMaterial({color: 0x00ff00}),
-    new THREE.MeshBasicMaterial({color: 0xff00ff}),
-    new THREE.MeshBasicMaterial({color: 0x00ffff}),
-    new THREE.MeshBasicMaterial({color: 0xffff00})
-  ];
-
-  // Create the cube and add it to the scene.
-  const cube = new THREE.Mesh(new THREE.BoxBufferGeometry(0.2, 0.2, 0.2), materials);
-  cube.position.set(0, -0.5, -1);
-  scene.add(cube);
-
-  const renderer = new THREE.WebGLRenderer({
-    alpha: false,
-    preserveDrawingBuffer: true,
-    canvas: canvas,
-    context: gl
-  });
-  renderer.autoClear = true;
-
-  const camera = new THREE.PerspectiveCamera();
-  camera.matrixAutoUpdate = false;
-
-  // Use "immersive-vr" instead of "immersive-ar"
-  const session = await navigator.xr.requestSession("immersive-vr");
-
-  session.updateRenderState({
-    baseLayer: new XRWebGLLayer(session, gl)
-  });
-
-  canvas.width = session.renderState.baseLayer.framebufferWidth;
-  canvas.height = session.renderState.baseLayer.framebufferHeight;
-  renderer.setSize(canvas.width, canvas.height, false);
-
-
-
-  const referenceSpace = await session.requestReferenceSpace('local');
-
-  const onXRFrame = (time, frame) => {
-    session.requestAnimationFrame(onXRFrame);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
-
-    const pose = frame.getViewerPose(referenceSpace);
-    if (pose) {
-      renderer.clear();
-
-      for (const view of pose.views) {
-        const viewport = session.renderState.baseLayer.getViewport(view);
-        renderer.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
-
-        camera.matrix.fromArray(view.transform.matrix);
-        camera.projectionMatrix.fromArray(view.projectionMatrix);
-        camera.updateMatrixWorld(true);
-
-        renderer.render(scene, camera);
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebXR VR Room with Controllers</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
       }
-    }
-  };
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "https://unpkg.com/three@0.156.0/build/three.module.js",
+				"three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
+				"vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
+				"controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
+			}
+		}
+	</script>
+    <script type="module">
+      import * as THREE from 'three';
+      import { VRButton } from 'vrButton';
+      import { XRControllerModelFactory } from 'controllerFactory';
 
-  session.requestAnimationFrame(onXRFrame);
-}
-</script>
-</body>
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x202030);
+
+      const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 1.6, 3);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+      document.body.appendChild(VRButton.createButton(renderer));
+
+      // Room box
+      const room = new THREE.Mesh(
+        new THREE.BoxGeometry(6, 3, 6),
+        new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
+      );
+      scene.add(room);
+
+      // Light
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+      light.position.set(0, 1, 0);
+      scene.add(light);
+
+      // Controllers
+      const controller1 = renderer.xr.getController(0);
+      scene.add(controller1);
+
+      const controller2 = renderer.xr.getController(1);
+      scene.add(controller2);
+
+      // Controller models
+      const controllerModelFactory = new XRControllerModelFactory();
+
+      const controllerGrip1 = renderer.xr.getControllerGrip(0);
+      controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+      scene.add(controllerGrip1);
+
+      const controllerGrip2 = renderer.xr.getControllerGrip(1);
+      controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+      scene.add(controllerGrip2);
+
+      // Animate
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
 </html>
