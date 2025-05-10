@@ -1,30 +1,78 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls/dist/aframe-blink-controls.min.js"></script>
+    <meta charset="UTF-8" />
+    <title>Basic A-Frame VR Scene</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- A-Frame core -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+    <!-- Super Hands for interaction -->
+    <script src="https://unpkg.com/aframe-super-hands-component@5.0.1/dist/aframe-super-hands-component.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
   </head>
   <body>
-    <a-scene>
-      <!-- Camera with look and movement controls -->
-      <a-entity id="cameraRig" position="0 0 0">
-        <a-camera wasd-controls-enabled="true" look-controls="pointerLockEnabled: true">
-          <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable"
-                    position="0 0 -1" geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                    material="color: black; shader: flat">
-          </a-entity>
-        </a-camera>
+    <a-scene physics="gravity: -9.8" background="color: #87CEFA">
+      <!-- Ground -->
+      <a-plane 
+        position="0 0 0" 
+        rotation="-90 0 0" 
+        width="30" 
+        height="30" 
+        color="#808080" 
+        static-body>
+      </a-plane>
+
+      <!-- Shapes (grabbable) -->
+      <a-box 
+        position="-1 1.5 -3" 
+        color="#F44336" 
+        depth="0.5" height="0.5" width="0.5"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-box>
+
+      <a-sphere 
+        position="1 1.5 -3" 
+        color="#4CAF50" 
+        radius="0.3"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-sphere>
+
+      <!-- Camera + Controllers -->
+      <a-entity id="cameraRig" position="0 1.6 0">
+        <a-entity camera look-controls wasd-controls></a-entity>
+
+        <!-- Right Hand Controller -->
+        <a-entity 
+          hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
+          super-hands 
+          physics-collider
+          collider-check
+          oculus-touch-controls="hand: right">
+        </a-entity>
+
+        <!-- Left Hand Controller -->
+        <a-entity 
+          hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
+          super-hands 
+          physics-collider
+          collider-check
+          oculus-touch-controls="hand: left">
+        </a-entity>
       </a-entity>
-
-      <!-- VR Controllers -->
-      <a-entity id="leftHand" hand-tracking-grab-controls="hand: left;"></a-entity>
-      <a-entity id="rightHand" hand-tracking-grab-controls="hand: right;"></a-entity>
-
-      <!-- Scene Objects -->
-      <a-box position="-1 0.5 -1" rotation="0 45 0" color="#4CC3D9"></a-box>
-      <a-sphere position="0 1.25 -2" radius="1.25" color="#EF2D5E"></a-sphere>
-      <a-cylinder position="1 0.75 -1" radius="0.5" height="1.5" color="#FFC65D" grabbable></a-cylinder>
-      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4"></a-plane>
-      <a-sky color="#19a9e7"></a-sky>
     </a-scene>
   </body>
 </html>
