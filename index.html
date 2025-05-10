@@ -14,16 +14,16 @@
     </style>
   </head>
   <body>
-	<script type="importmap">
-		{
-			"imports": {
-				"three": "https://unpkg.com/three@0.156.0/build/three.module.js",
-				"three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
-				"vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
-				"controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
-			}
-		}
-	</script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.156.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
+          "vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
+          "controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
+        }
+      }
+    </script>
     <script type="module">
       import * as THREE from 'three';
       import { VRButton } from 'vrButton';
@@ -52,6 +52,13 @@
       const light = new THREE.HemisphereLight(0xffffff, 0x444444);
       light.position.set(0, 1, 0);
       scene.add(light);
+
+      // Cube floating in front of the user
+      const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+      const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+      const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+      cube.position.set(0, 1.6, -1);
+      scene.add(cube);
 
       // Controllers
       const controller1 = renderer.xr.getController(0);
