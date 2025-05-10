@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebXR VR Room with Controllers</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.156.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
+      "vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
+      "controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { VRButton } from 'vrButton';
+  import { XRControllerModelFactory } from 'controllerFactory';
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x202030);
+
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 1, 3);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+
+  // Static room
+  const room = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 3, 6),
+    new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
+  );
+  room.position.y = -1.5;
+  scene.add(room);
+
+  // Movable scene content
+  const sceneGroup = new THREE.Group();
+  scene.add(sceneGroup);
+
+  // Light and floating cube
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+  light.position.set(0, 1, 0);
+  sceneGroup.add(light);
+
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.3, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x00ffcc })
+  );
+  cube.position.set(0, 1.6, -1);
+  sceneGroup.add(cube);
+
+  // Controllers and models
+  const controllerModelFactory = new XRControllerModelFactory();
+
+  const controller1 = renderer.xr.getController(0);
+  const controller2 = renderer.xr.getController(1);
+  scene.add(controller1, controller2);
+
+  const controllerGrip1 = renderer.xr.getControllerGrip(0);
+  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+  scene.add(controllerGrip1);
+
+  const controllerGrip2 = renderer.xr.getControllerGrip(1);
+  controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+  scene.add(controllerGrip2);
+
+  // Track grab states
+  let controllerStates = {
+    left: {
+      controller: controller1,
+      isGrabbing: false,
+      lastPos: new THREE.Vector3()
+    },
+    right: {
+      controller: controller2,
+      isGrabbing: false,
+      lastPos: new THREE.Vector3()
+    }
+  };
+
+  // Initial values for scaling/rotation
+  let initialMidpoint = new THREE.Vector3();
+  let initialDir = new THREE.Vector3();
+  let initialScale = 1;
+  let initialRotation = new THREE.Quaternion();
+  let initialScenePosition = new THREE.Vector3();
+
+  function onBothGrabStart() {
+    const pos1 = controllerStates.left.controller.position;
+    const pos2 = controllerStates.right.controller.position;
+
+    initialMidpoint.copy(pos1).add(pos2).multiplyScalar(0.5);
+    initialDir.subVectors(pos2, pos1).normalize();
+    initialScale = sceneGroup.scale.x;
+    initialRotation.copy(sceneGroup.quaternion);
+    initialScenePosition.copy(sceneGroup.position);
+  }
+
+  controller1.addEventListener('squeezestart', () => {
+    controllerStates.left.isGrabbing = true;
+    controllerStates.left.lastPos.copy(controller1.position);
+    if (controllerStates.right.isGrabbing) onBothGrabStart();
+  });
+
+  controller1.addEventListener('squeezeend', () => {
+    controllerStates.left.isGrabbing = false;
+  });
+
+  controller2.addEventListener('squeezestart', () => {
+    controllerStates.right.isGrabbing = true;
+    controllerStates.right.lastPos.copy(controller2.position);
+    if (controllerStates.left.isGrabbing) onBothGrabStart();
+  });
+
+  controller2.addEventListener('squeezeend', () => {
+    controllerStates.right.isGrabbing = false;
+  });
+
+  // Animation loop
+  renderer.setAnimationLoop(() => {
+    const left = controllerStates.left;
+    const right = controllerStates.right;
+
+    const bothGrabbing = left.isGrabbing && right.isGrabbing;
+    const oneGrabbing = (left.isGrabbing && !right.isGrabbing) || (!left.isGrabbing && right.isGrabbing);
+
+    // Panning with one hand
+    if (oneGrabbing) {
+      const active = left.isGrabbing ? left : right;
+      const delta = new THREE.Vector3().subVectors(active.controller.position, active.lastPos);
+      sceneGroup.position.add(delta);
+      active.lastPos.copy(active.controller.position);
+    }
+
+    // Zoom and rotate with both hands
+    if (bothGrabbing) {
+      const pos1 = left.controller.position;
+      const pos2 = right.controller.position;
+
+      const currentMid = new THREE.Vector3().addVectors(pos1, pos2).multiplyScalar(0.5);
+      const currentDir = new THREE.Vector3().subVectors(pos2, pos1).normalize();
+
+      // Scale
+      const currentDistance = pos1.distanceTo(pos2);
+
+      const initialDistance = initialDir.length(); // store at grab time
+      const scaleFactor = currentDistance / initialDistance;
+
+      const newScale = THREE.MathUtils.clamp(initialScale * scaleFactor, 0.1, 10);
+      sceneGroup.scale.setScalar(newScale);
+
+      // Rotation
+      const rotationQuat = new THREE.Quaternion().setFromUnitVectors(initialDir, currentDir);
+      const newRotation = initialRotation.clone().multiply(rotationQuat);
+      sceneGroup.quaternion.copy(newRotation);
+
+      // Position adjustment to maintain controller anchors
+      const rotatedOffset = new THREE.Vector3().subVectors(currentMid, initialMidpoint).applyQuaternion(rotationQuat);
+      sceneGroup.position.copy(initialScenePosition.clone().add(rotatedOffset));
+    }
+
+    renderer.render(scene, camera);
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
