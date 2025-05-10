@@ -94,28 +94,43 @@
     }
   };
 
-  // Events
+  // Initial values for scaling/rotation
+  let initialMidpoint = new THREE.Vector3();
+  let initialDir = new THREE.Vector3();
+  let initialScale = 1;
+  let initialRotation = new THREE.Quaternion();
+  let initialScenePosition = new THREE.Vector3();
+
+  function onBothGrabStart() {
+    const pos1 = controllerStates.left.controller.position;
+    const pos2 = controllerStates.right.controller.position;
+
+    initialMidpoint.copy(pos1).add(pos2).multiplyScalar(0.5);
+    initialDir.subVectors(pos2, pos1).normalize();
+    initialScale = sceneGroup.scale.x;
+    initialRotation.copy(sceneGroup.quaternion);
+    initialScenePosition.copy(sceneGroup.position);
+  }
+
   controller1.addEventListener('squeezestart', () => {
     controllerStates.left.isGrabbing = true;
     controllerStates.left.lastPos.copy(controller1.position);
+    if (controllerStates.right.isGrabbing) onBothGrabStart();
   });
+
   controller1.addEventListener('squeezeend', () => {
     controllerStates.left.isGrabbing = false;
-    initialDistance = null;
   });
 
   controller2.addEventListener('squeezestart', () => {
     controllerStates.right.isGrabbing = true;
     controllerStates.right.lastPos.copy(controller2.position);
-  });
-  controller2.addEventListener('squeezeend', () => {
-    controllerStates.right.isGrabbing = false;
-    initialDistance = null;
+    if (controllerStates.left.isGrabbing) onBothGrabStart();
   });
 
-  let initialDistance = null;
-  let initialScale = 1;
-  let initialRotation = new THREE.Quaternion();
+  controller2.addEventListener('squeezeend', () => {
+    controllerStates.right.isGrabbing = false;
+  });
 
   // Animation loop
   renderer.setAnimationLoop(() => {
@@ -138,23 +153,24 @@
       const pos1 = left.controller.position;
       const pos2 = right.controller.position;
 
-      // Zooming
+      const currentMid = new THREE.Vector3().addVectors(pos1, pos2).multiplyScalar(0.5);
+      const currentDir = new THREE.Vector3().subVectors(pos2, pos1).normalize();
+
+      // Scale
       const currentDistance = pos1.distanceTo(pos2);
-      if (initialDistance === null) {
-        initialDistance = currentDistance;
-        initialScale = sceneGroup.scale.x;
-        initialRotation.copy(sceneGroup.quaternion);
-      } else {
-        const scaleFactor = currentDistance / initialDistance;
-        const newScale = THREE.MathUtils.clamp(initialScale * scaleFactor, 0.1, 10);
-        sceneGroup.scale.setScalar(newScale);
-      }
+      const initialDistance = 1; // assume initialDir is normalized
+      const scaleFactor = currentDistance / (pos1.clone().sub(pos2).length());
+      const newScale = THREE.MathUtils.clamp(initialScale * scaleFactor, 0.1, 10);
+      sceneGroup.scale.setScalar(newScale);
 
       // Rotation
-      const currentDir = new THREE.Vector3().subVectors(pos2, pos1).normalize();
-      const baseDir = new THREE.Vector3(1, 0, 0);
-      const rotationQuat = new THREE.Quaternion().setFromUnitVectors(baseDir, currentDir);
-      sceneGroup.quaternion.copy(initialRotation.clone().multiply(rotationQuat));
+      const rotationQuat = new THREE.Quaternion().setFromUnitVectors(initialDir, currentDir);
+      const newRotation = initialRotation.clone().multiply(rotationQuat);
+      sceneGroup.quaternion.copy(newRotation);
+
+      // Position adjustment to maintain controller anchors
+      const rotatedOffset = new THREE.Vector3().subVectors(currentMid, initialMidpoint).applyQuaternion(rotationQuat);
+      sceneGroup.position.copy(initialScenePosition.clone().add(rotatedOffset));
     }
 
     renderer.render(scene, camera);
