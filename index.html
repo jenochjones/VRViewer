@@ -41,7 +41,7 @@
   document.body.appendChild(renderer.domElement);
   document.body.appendChild(VRButton.createButton(renderer));
 
-  // Room (static)
+  // Static room
   const room = new THREE.Mesh(
     new THREE.BoxGeometry(6, 3, 6),
     new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
@@ -49,28 +49,29 @@
   room.position.y = -1.5;
   scene.add(room);
 
-  // Create a group for movable scene objects
+  // Movable scene content
   const sceneGroup = new THREE.Group();
   scene.add(sceneGroup);
 
-  // Light
+  // Light and floating cube
   const light = new THREE.HemisphereLight(0xffffff, 0x444444);
   light.position.set(0, 1, 0);
   sceneGroup.add(light);
 
-  // Floating cube
-  const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
-  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.3, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x00ffcc })
+  );
   cube.position.set(0, 1.6, -1);
   sceneGroup.add(cube);
 
-  // Controllers
+  // Controllers and models
+  const controllerModelFactory = new XRControllerModelFactory();
+
   const controller1 = renderer.xr.getController(0);
   const controller2 = renderer.xr.getController(1);
   scene.add(controller1, controller2);
 
-  const controllerModelFactory = new XRControllerModelFactory();
   const controllerGrip1 = renderer.xr.getControllerGrip(0);
   controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
   scene.add(controllerGrip1);
@@ -79,55 +80,81 @@
   controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
   scene.add(controllerGrip2);
 
-  // Grabbing state
-  let isGrabbing = false;
-  let lastControllerPos = new THREE.Vector3();
+  // Track grab states
+  let controllerStates = {
+    left: {
+      controller: controller1,
+      isGrabbing: false,
+      lastPos: new THREE.Vector3()
+    },
+    right: {
+      controller: controller2,
+      isGrabbing: false,
+      lastPos: new THREE.Vector3()
+    }
+  };
+
+  // Events
+  controller1.addEventListener('squeezestart', () => {
+    controllerStates.left.isGrabbing = true;
+    controllerStates.left.lastPos.copy(controller1.position);
+  });
+  controller1.addEventListener('squeezeend', () => {
+    controllerStates.left.isGrabbing = false;
+    initialDistance = null;
+  });
+
+  controller2.addEventListener('squeezestart', () => {
+    controllerStates.right.isGrabbing = true;
+    controllerStates.right.lastPos.copy(controller2.position);
+  });
+  controller2.addEventListener('squeezeend', () => {
+    controllerStates.right.isGrabbing = false;
+    initialDistance = null;
+  });
+
   let initialDistance = null;
   let initialScale = 1;
-
-  function onSqueezeStart(event) {
-    isGrabbing = true;
-    lastControllerPos.copy(event.target.position);
-  }
-
-  function onSqueezeEnd() {
-    isGrabbing = false;
-    initialDistance = null;
-  }
-
-  controller1.addEventListener('squeezestart', onSqueezeStart);
-  controller1.addEventListener('squeezeend', onSqueezeEnd);
-
-  controller2.addEventListener('squeezestart', onSqueezeStart);
-  controller2.addEventListener('squeezeend', onSqueezeEnd);
+  let initialRotation = new THREE.Quaternion();
 
   // Animation loop
   renderer.setAnimationLoop(() => {
-    if (isGrabbing) {
-      const pos1 = controller1.position;
-      const pos2 = controller2.position;
+    const left = controllerStates.left;
+    const right = controllerStates.right;
 
-      // 1. Panning (drag)
-      const delta = new THREE.Vector3().subVectors(pos1, lastControllerPos);
+    const bothGrabbing = left.isGrabbing && right.isGrabbing;
+    const oneGrabbing = (left.isGrabbing && !right.isGrabbing) || (!left.isGrabbing && right.isGrabbing);
+
+    // Panning with one hand
+    if (oneGrabbing) {
+      const active = left.isGrabbing ? left : right;
+      const delta = new THREE.Vector3().subVectors(active.controller.position, active.lastPos);
       sceneGroup.position.add(delta);
-      lastControllerPos.copy(pos1);
+      active.lastPos.copy(active.controller.position);
+    }
 
-      // 2. Zooming
+    // Zoom and rotate with both hands
+    if (bothGrabbing) {
+      const pos1 = left.controller.position;
+      const pos2 = right.controller.position;
+
+      // Zooming
       const currentDistance = pos1.distanceTo(pos2);
       if (initialDistance === null) {
         initialDistance = currentDistance;
         initialScale = sceneGroup.scale.x;
+        initialRotation.copy(sceneGroup.quaternion);
       } else {
         const scaleFactor = currentDistance / initialDistance;
-        const newScale = initialScale * scaleFactor;
+        const newScale = THREE.MathUtils.clamp(initialScale * scaleFactor, 0.1, 10);
         sceneGroup.scale.setScalar(newScale);
       }
 
-      // 3. Rotation (based on vector between controllers)
-      const dir1 = new THREE.Vector3().subVectors(pos2, pos1).normalize();
-      const dir2 = new THREE.Vector3(1, 0, 0); // reference
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(dir2, dir1);
-      sceneGroup.setRotationFromQuaternion(quaternion);
+      // Rotation
+      const currentDir = new THREE.Vector3().subVectors(pos2, pos1).normalize();
+      const baseDir = new THREE.Vector3(1, 0, 0);
+      const rotationQuat = new THREE.Quaternion().setFromUnitVectors(baseDir, currentDir);
+      sceneGroup.quaternion.copy(initialRotation.clone().multiply(rotationQuat));
     }
 
     renderer.render(scene, camera);
