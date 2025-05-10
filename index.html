@@ -16,18 +16,8 @@
       </a-entity>
 
       <!-- VR Controllers -->
-      <a-entity id="left-hand"
-        brush
-        paint-controls="hand: left"
-        ui
-        >
-      </a-entity>
-      <a-entity id="right-hand"
-        brush
-        paint-controls="hand: right"
-        ui
-        >
-      </a-entity>
+      <a-entity id="leftHand" hand-tracking-grab-controls="hand: left;"></a-entity>
+      <a-entity id="rightHand" hand-tracking-grab-controls="hand: right;"></a-entity>
 
       <!-- Scene Objects -->
       <a-box position="-1 0.5 -1" rotation="0 45 0" color="#4CC3D9"></a-box>
