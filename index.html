@@ -33,7 +33,7 @@
       scene.background = new THREE.Color(0x202030);
 
       const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 1.6, 3);
+      camera.position.set(0, 1, 3);
 
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -43,7 +43,7 @@
 
       // Room box
       const room = new THREE.Mesh(
-        new THREE.BoxGeometry(6, 3, 6),
+        new THREE.BoxGeometry(0, 3, 6),
         new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
       );
       scene.add(room);
