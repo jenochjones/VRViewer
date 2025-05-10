@@ -43,9 +43,10 @@
 
       // Room box
       const room = new THREE.Mesh(
-        new THREE.BoxGeometry(0, 3, 6),
+        new THREE.BoxGeometry(6, 3, 6),
         new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
       );
+	  room.position.y = -1.5;
       scene.add(room);
 
       // Light
