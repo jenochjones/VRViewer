@@ -114,7 +114,7 @@
       <a-sky src="#skyTexture"  radius="100"></a-sky>
     
       <!-- Group all rotatable objects under sceneRoot -->
-      <a-entity id="sceneRoot" drag-rotate="left: #leftHand, right: #rightHand, target: #sceneRoot">
+      <a-entity id="sceneRoot" two-hand-rotate="left: #leftHand, right: #rightHand, target: #sceneRoot">
         <a-box 
           position="-1 1.5 -1" 
           color="#F44336" 
@@ -157,8 +157,7 @@
           physics-collider
           collider-check
           oculus-touch-controls="hand: left"
-          drag-pan="rig: #cameraRig"
-          drag-rotate="rig: #cameraRig">
+          drag-pan="rig: #cameraRig">
         </a-entity>
       </a-entity>
     </a-scene>
