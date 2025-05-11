@@ -1,166 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>GIS VR</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- A-Frame core -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<head>
+  <meta charset="UTF-8" />
+  <title>GIS VR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Super Hands for interaction -->
-    <script src="https://unpkg.com/aframe-super-hands-component@5.0.1/dist/aframe-super-hands-component.min.js"></script>
+  <!-- A-Frame core -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-      }
-    </style>
-    
-    <!-- Custom drag-pan and two-hand-rotate components -->
-    <script>
-      AFRAME.registerComponent('drag-pan', {
-        schema: {
-          rig: { type: 'selector' }
-        },
-        init: function () {
+  <!-- Super Hands for interaction -->
+  <script src="https://unpkg.com/aframe-super-hands-component@5.0.1/dist/aframe-super-hands-component.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+
+  <!-- Custom drag-pan and two-hand-transform components -->
+  <script>
+    AFRAME.registerComponent('drag-pan', {
+      schema: {
+        rig: { type: 'selector' }
+      },
+      init: function () {
+        this.grabbing = false;
+        this.prevPosition = new THREE.Vector3();
+
+        this.el.addEventListener('gripdown', () => {
+          this.grabbing = true;
+          this.prevPosition.copy(this.el.object3D.position);
+        });
+
+        this.el.addEventListener('gripup', () => {
           this.grabbing = false;
-          this.prevPosition = new THREE.Vector3();
+        });
+      },
+      tick: function () {
+        if (!this.grabbing) return;
 
-          this.el.addEventListener('gripdown', () => {
-            this.grabbing = true;
-            this.prevPosition.copy(this.el.object3D.position);
-          });
+        const currentPosition = this.el.object3D.position;
+        const delta = new THREE.Vector3().subVectors(currentPosition, this.prevPosition);
 
-          this.el.addEventListener('gripup', () => {
-            this.grabbing = false;
-          });
-        },
-        tick: function () {
-          if (!this.grabbing) return;
+        this.data.rig.object3D.position.sub(delta);
+        this.prevPosition.copy(currentPosition);
+      }
+    });
 
-          const currentPosition = this.el.object3D.position;
-          const delta = new THREE.Vector3().subVectors(currentPosition, this.prevPosition);
+    AFRAME.registerComponent('two-hand-transform', {
+      schema: {
+        left: { type: 'selector' },
+        right: { type: 'selector' }
+      },
+      init: function () {
+        this.active = false;
+        this.initialDistance = 0;
+        this.initialRotation = 0;
+        this.initialScale = this.el.object3D.scale.clone();
+        this.initialMidpoint = new THREE.Vector3();
+        this.startRotation = new THREE.Quaternion();
 
-          // Move the rig opposite to hand motion for panning effect
-          this.data.rig.object3D.position.sub(delta);
-          this.prevPosition.copy(currentPosition);
-        }
-      });
+        this.leftGrabbing = false;
+        this.rightGrabbing = false;
 
-      AFRAME.registerComponent('two-hand-rotate', {
-        schema: {
-          left: { type: 'selector' },
-          right: { type: 'selector' },
-          target: { type: 'selector' }
-        },
-        init: function () {
+        this.data.left.addEventListener('gripdown', () => {
+          this.leftGrabbing = true;
+          this.tryStart();
+        });
+        this.data.right.addEventListener('gripdown', () => {
+          this.rightGrabbing = true;
+          this.tryStart();
+        });
+
+        this.data.left.addEventListener('gripup', () => {
           this.leftGrabbing = false;
+          this.active = false;
+        });
+        this.data.right.addEventListener('gripup', () => {
           this.rightGrabbing = false;
-          this.prevVector = new THREE.Vector3();
-
-          this.data.left.addEventListener('gripdown', () => {
-            this.leftGrabbing = true;
-          });
-          this.data.left.addEventListener('gripup', () => {
-            this.leftGrabbing = false;
-          });
-
-          this.data.right.addEventListener('gripdown', () => {
-            this.rightGrabbing = true;
-          });
-          this.data.right.addEventListener('gripup', () => {
-            this.rightGrabbing = false;
-          });
-        },
-        tick: function () {
-          if (!(this.leftGrabbing && this.rightGrabbing)) return;
-
+          this.active = false;
+        });
+      },
+      tryStart: function () {
+        if (this.leftGrabbing && this.rightGrabbing) {
           const leftPos = this.data.left.object3D.position;
           const rightPos = this.data.right.object3D.position;
 
-          const midpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
-          const currentVector = new THREE.Vector3().subVectors(rightPos, leftPos);
+          this.initialDistance = leftPos.distanceTo(rightPos);
+          this.initialMidpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+          this.initialScale = this.el.object3D.scale.clone();
+          this.startRotation.copy(this.el.object3D.quaternion);
 
-          if (this.prevVector.lengthSq() > 0) {
-            const angle = currentVector.angleTo(this.prevVector);
-            if (angle > 0.001) {
-              const axis = new THREE.Vector3().crossVectors(this.prevVector, currentVector).normalize();
-              const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+          const dir = new THREE.Vector3().subVectors(rightPos, leftPos).normalize();
+          this.initialRotation = Math.atan2(dir.z, dir.x);
 
-              const target = this.data.target.object3D;
-
-              target.position.sub(midpoint);
-              target.position.applyQuaternion(quaternion);
-              target.position.add(midpoint);
-
-              target.quaternion.premultiply(quaternion);
-            }
-          }
-
-          this.prevVector.copy(currentVector);
+          this.active = true;
         }
-      });
+      },
+      tick: function () {
+        if (!this.active) return;
 
-    </script>
-  </head>
-  <body>
-    <a-scene physics="gravity: -9.8" background="color: #87CEFA">
-      <a-assets>
-        <img id="skyTexture" src="public/images/sky.jpg">
-      </a-assets>
-    
-      <a-sky src="#skyTexture"  radius="100"></a-sky>
-    
-      <!-- Group all rotatable objects under sceneRoot -->
-      <a-entity id="sceneRoot" two-hand-rotate="left: #leftHand, right: #rightHand, target: #sceneRoot">
-        <a-box 
-          position="-1 1.5 -1" 
-          color="#F44336" 
-          depth="0.5" height="0.5" width="0.5"
-          dynamic-body 
-          grabbable 
-          stretchable 
-          draggable>
-        </a-box>
-    
-        <a-sphere 
-          position="1 1.5 -1.5" 
-          color="#4CAF50" 
-          radius="0.3"
-          dynamic-body 
-          grabbable 
-          stretchable 
-          draggable>
-        </a-sphere>
+        const leftPos = this.data.left.object3D.position;
+        const rightPos = this.data.right.object3D.position;
+
+        // Scaling
+        const currentDistance = leftPos.distanceTo(rightPos);
+        const scaleFactor = currentDistance / this.initialDistance;
+        this.el.object3D.scale.set(
+          this.initialScale.x * scaleFactor,
+          this.initialScale.y * scaleFactor,
+          this.initialScale.z * scaleFactor
+        );
+
+        // Rotation
+        const dir = new THREE.Vector3().subVectors(rightPos, leftPos).normalize();
+        const currentRotation = Math.atan2(dir.z, dir.x);
+        const deltaRotation = currentRotation - this.initialRotation;
+
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaRotation);
+        this.el.object3D.quaternion.copy(this.startRotation).multiply(quaternion);
+
+        // Position (center between hands)
+        const midpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+        this.el.object3D.position.copy(midpoint);
+      }
+    });
+  </script>
+</head>
+<body>
+  <a-scene physics="gravity: -9.8" background="color: #87CEFA">
+    <a-assets>
+      <img id="skyTexture" src="public/images/sky.png">
+    </a-assets>
+
+    <a-sky src="#skyTexture" radius="100"></a-sky>
+
+    <!-- Rotatable and scalable group -->
+    <a-entity id="sceneRoot"
+              two-hand-transform="left: #leftHand; right: #rightHand">
+      <a-box 
+        position="-1 1.5 -1" 
+        color="#F44336" 
+        depth="0.5" height="0.5" width="0.5"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-box>
+
+      <a-sphere 
+        position="1 1.5 -1.5" 
+        color="#4CAF50" 
+        radius="0.3"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-sphere>
+    </a-entity>
+
+    <!-- Camera + Controllers -->
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-entity camera look-controls wasd-controls></a-entity>
+
+      <!-- Right Hand -->
+      <a-entity id="rightHand"
+        hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: right"
+        drag-pan="rig: #cameraRig">
       </a-entity>
-    
-      <!-- Camera + Controllers -->
-      <a-entity id="cameraRig" position="0 1.6 0">
-        <a-entity camera look-controls wasd-controls></a-entity>
-    
-        <!-- Right Hand -->
-        <a-entity id="rightHand"
-          hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
-          super-hands 
-          physics-collider
-          collider-check
-          oculus-touch-controls="hand: right"
-          drag-pan="rig: #cameraRig">
-        </a-entity>
-    
-        <!-- Left Hand -->
-        <a-entity id="leftHand"
-          hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
-          super-hands 
-          physics-collider
-          collider-check
-          oculus-touch-controls="hand: left"
-          drag-pan="rig: #cameraRig">
-        </a-entity>
+
+      <!-- Left Hand -->
+      <a-entity id="leftHand"
+        hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: left"
+        drag-pan="rig: #cameraRig">
       </a-entity>
-    </a-scene>
-    
-  </body>
+    </a-entity>
+  </a-scene>
+</body>
 </html>
