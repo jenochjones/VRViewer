@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Basic A-Frame VR Scene</title>
+    <title>GIS VR</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- A-Frame core -->
@@ -17,6 +17,38 @@
         overflow: hidden;
       }
     </style>
+    
+    <!-- Custom drag-pan component -->
+    <script>
+      AFRAME.registerComponent('drag-pan', {
+        schema: {
+          rig: { type: 'selector' }
+        },
+        init: function () {
+          this.grabbing = false;
+          this.prevPosition = new THREE.Vector3();
+
+          this.el.addEventListener('gripdown', () => {
+            this.grabbing = true;
+            this.prevPosition.copy(this.el.object3D.position);
+          });
+
+          this.el.addEventListener('gripup', () => {
+            this.grabbing = false;
+          });
+        },
+        tick: function () {
+          if (!this.grabbing) return;
+
+          const currentPosition = this.el.object3D.position;
+          const delta = new THREE.Vector3().subVectors(currentPosition, this.prevPosition);
+
+          // Move the rig opposite to hand motion for panning effect
+          this.data.rig.object3D.position.sub(delta);
+          this.prevPosition.copy(currentPosition);
+        }
+      });
+    </script>
   </head>
   <body>
     <a-scene physics="gravity: -9.8" background="color: #87CEFA">
@@ -32,7 +64,7 @@
 
       <!-- Shapes (grabbable) -->
       <a-box 
-        position="-1 1.5 -3" 
+        position="-1 1.5 -1" 
         color="#F44336" 
         depth="0.5" height="0.5" width="0.5"
         dynamic-body 
@@ -42,7 +74,7 @@
       </a-box>
 
       <a-sphere 
-        position="1 1.5 -3" 
+        position="1 1.5 -1.5" 
         color="#4CAF50" 
         radius="0.3"
         dynamic-body 
@@ -61,7 +93,8 @@
           super-hands 
           physics-collider
           collider-check
-          oculus-touch-controls="hand: right">
+          oculus-touch-controls="hand: right"
+          drag-pan="rig: #cameraRig">
         </a-entity>
 
         <!-- Left Hand Controller -->
@@ -70,7 +103,8 @@
           super-hands 
           physics-collider
           collider-check
-          oculus-touch-controls="hand: left">
+          oculus-touch-controls="hand: left"
+          drag-pan="rig: #cameraRig">
         </a-entity>
       </a-entity>
     </a-scene>
