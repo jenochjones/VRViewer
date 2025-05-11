@@ -84,7 +84,7 @@
           const currentVector = new THREE.Vector3().subVectors(rightPos, leftPos);
 
           if (this.prevVector.lengthSq() > 0) {
-            const angle = -currentVector.angleTo(this.prevVector);
+            const angle = currentVector.angleTo(this.prevVector);
             if (angle > 0.001) {
               const axis = new THREE.Vector3().crossVectors(this.prevVector, currentVector).normalize();
               const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
