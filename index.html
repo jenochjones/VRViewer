@@ -18,7 +18,7 @@
       }
     </style>
     
-    <!-- Custom drag-pan component -->
+    <!-- Custom drag-pan and two-hand-rotate components -->
     <script>
       AFRAME.registerComponent('drag-pan', {
         schema: {
@@ -48,12 +48,68 @@
           this.prevPosition.copy(currentPosition);
         }
       });
+
+      AFRAME.registerComponent('two-hand-rotate', {
+        schema: {
+          left: { type: 'selector' },
+          right: { type: 'selector' }
+        },
+        init: function () {
+          this.leftGrabbing = false;
+          this.rightGrabbing = false;
+          this.prevVector = new THREE.Vector3();
+
+          this.data.left.addEventListener('gripdown', () => {
+            this.leftGrabbing = true;
+          });
+          this.data.left.addEventListener('gripup', () => {
+            this.leftGrabbing = false;
+          });
+
+          this.data.right.addEventListener('gripdown', () => {
+            this.rightGrabbing = true;
+          });
+          this.data.right.addEventListener('gripup', () => {
+            this.rightGrabbing = false;
+          });
+        },
+        tick: function () {
+          if (!(this.leftGrabbing && this.rightGrabbing)) return;
+
+          const leftPos = this.data.left.object3D.position;
+          const rightPos = this.data.right.object3D.position;
+
+          const midpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+          const currentVector = new THREE.Vector3().subVectors(rightPos, leftPos);
+
+          if (this.prevVector.lengthSq() > 0) {
+            const angle = currentVector.angleTo(this.prevVector);
+            if (angle > 0.001) {
+              const axis = new THREE.Vector3().crossVectors(this.prevVector, currentVector).normalize();
+              const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+
+              const rig = this.el.object3D;
+
+              rig.position.sub(midpoint);
+              rig.position.applyQuaternion(quaternion);
+              rig.position.add(midpoint);
+
+              rig.quaternion.premultiply(quaternion);
+            }
+          }
+
+          this.prevVector.copy(currentVector);
+        }
+      });
+
     </script>
   </head>
   <body>
     <a-scene physics="gravity: -9.8" background="color: #87CEFA">
-      <!-- Ground -->
-
+      <a-sky src="#skyTexture"></a-sky>
+      <a-assets>
+        <img id="skyTexture" src="public/images/sky.png">
+      </a-assets>
 
       <!-- Shapes (grabbable) -->
       <a-box 
@@ -77,11 +133,12 @@
       </a-sphere>
 
       <!-- Camera + Controllers -->
-      <a-entity id="cameraRig" position="0 1.6 0">
+      <a-entity id="cameraRig" position="0 1.6 0"
+        two-hand-rotate="left: #leftHand; right: #rightHand">
         <a-entity camera look-controls wasd-controls></a-entity>
 
         <!-- Right Hand Controller -->
-        <a-entity 
+        <a-entity id="rightHand"
           hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
           super-hands 
           physics-collider
@@ -91,7 +148,7 @@
         </a-entity>
 
         <!-- Left Hand Controller -->
-        <a-entity 
+        <a-entity id="leftHand"
           hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
           super-hands 
           physics-collider
