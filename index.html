@@ -52,7 +52,8 @@
       AFRAME.registerComponent('two-hand-rotate', {
         schema: {
           left: { type: 'selector' },
-          right: { type: 'selector' }
+          right: { type: 'selector' },
+          target: { type: 'selector' }
         },
         init: function () {
           this.leftGrabbing = false;
@@ -83,18 +84,18 @@
           const currentVector = new THREE.Vector3().subVectors(rightPos, leftPos);
 
           if (this.prevVector.lengthSq() > 0) {
-            const angle = currentVector.angleTo(this.prevVector);
+            const angle = -currentVector.angleTo(this.prevVector);
             if (angle > 0.001) {
               const axis = new THREE.Vector3().crossVectors(this.prevVector, currentVector).normalize();
               const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
 
-              const rig = this.el.object3D;
+              const target = this.data.target.object3D;
 
-              rig.position.sub(midpoint);
-              rig.position.applyQuaternion(quaternion);
-              rig.position.add(midpoint);
+              target.position.sub(midpoint);
+              target.position.applyQuaternion(quaternion);
+              target.position.add(midpoint);
 
-              rig.quaternion.premultiply(quaternion);
+              target.quaternion.premultiply(quaternion);
             }
           }
 
@@ -106,38 +107,40 @@
   </head>
   <body>
     <a-scene physics="gravity: -9.8" background="color: #87CEFA">
-      <a-sky src="#skyTexture"></a-sky>
       <a-assets>
         <img id="skyTexture" src="public/images/sky.png">
       </a-assets>
-
-      <!-- Shapes (grabbable) -->
-      <a-box 
-        position="-1 1.5 -1" 
-        color="#F44336" 
-        depth="0.5" height="0.5" width="0.5"
-        dynamic-body 
-        grabbable 
-        stretchable 
-        draggable>
-      </a-box>
-
-      <a-sphere 
-        position="1 1.5 -1.5" 
-        color="#4CAF50" 
-        radius="0.3"
-        dynamic-body 
-        grabbable 
-        stretchable 
-        draggable>
-      </a-sphere>
-
+    
+      <a-sky src="#skyTexture"></a-sky>
+    
+      <!-- Group all rotatable objects under sceneRoot -->
+      <a-entity id="sceneRoot">
+        <a-box 
+          position="-1 1.5 -1" 
+          color="#F44336" 
+          depth="0.5" height="0.5" width="0.5"
+          dynamic-body 
+          grabbable 
+          stretchable 
+          draggable>
+        </a-box>
+    
+        <a-sphere 
+          position="1 1.5 -1.5" 
+          color="#4CAF50" 
+          radius="0.3"
+          dynamic-body 
+          grabbable 
+          stretchable 
+          draggable>
+        </a-sphere>
+      </a-entity>
+    
       <!-- Camera + Controllers -->
-      <a-entity id="cameraRig" position="0 1.6 0"
-        two-hand-rotate="left: #leftHand; right: #rightHand">
+      <a-entity id="cameraRig" position="0 1.6 0">
         <a-entity camera look-controls wasd-controls></a-entity>
-
-        <!-- Right Hand Controller -->
+    
+        <!-- Right Hand -->
         <a-entity id="rightHand"
           hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
           super-hands 
@@ -146,8 +149,8 @@
           oculus-touch-controls="hand: right"
           drag-pan="rig: #cameraRig">
         </a-entity>
-
-        <!-- Left Hand Controller -->
+    
+        <!-- Left Hand -->
         <a-entity id="leftHand"
           hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
           super-hands 
@@ -158,5 +161,6 @@
         </a-entity>
       </a-entity>
     </a-scene>
+    
   </body>
 </html>
