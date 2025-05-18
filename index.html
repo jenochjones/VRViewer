@@ -144,33 +144,20 @@
       }
     });
 
-    AFRAME.registerComponent('wrist-menu', {
-      schema: {
-        camera: { type: 'selector' },
-        threshold: { type: 'number', default: 0.8 } // cosine of angle (~36°)
-      },
+    <!-- Place this in <head> -->
+
+    AFRAME.registerComponent('menu-handler', {
       init: function () {
-        this.menu = this.el.querySelector('.menu');
-        this.cameraEl = this.data.camera;
-      },
-      tick: function () {
-        if (!this.menu || !this.cameraEl) return;
+        const menu = document.querySelector('#menu');
+        let menuVisible = false;
 
-        const wristWorldPos = new THREE.Vector3();
-        const cameraWorldPos = new THREE.Vector3();
-        const cameraDir = new THREE.Vector3();
-
-        this.el.object3D.getWorldPosition(wristWorldPos);
-        this.cameraEl.object3D.getWorldPosition(cameraWorldPos);
-        this.cameraEl.object3D.getWorldDirection(cameraDir);
-
-        const toWrist = wristWorldPos.clone().sub(cameraWorldPos).normalize();
-        const dot = cameraDir.dot(toWrist);
-
-        const looking = dot > this.data.threshold;
-        this.menu.setAttribute('visible', looking);
+        this.el.addEventListener('xbuttondown', () => {
+          menuVisible = !menuVisible;
+          menu.setAttribute('visible', menuVisible);
+        });
       }
     });
+
   </script>
 </head>
 <body>
@@ -182,7 +169,6 @@
     <a-sky src="#skyTexture" radius="100"></a-sky>
 
     <!-- Rotatable and scalable group -->
-     
     <a-entity id="sceneRoot"
               two-hand-transform="left: #leftHand; right: #rightHand">
       <a-box 
@@ -208,7 +194,7 @@
 
     <!-- Camera + Controllers -->
     <a-entity id="cameraRig" position="0 1.6 0">
-      <a-entity id="camera" camera look-controls wasd-controls></a-entity>
+      <a-entity camera look-controls wasd-controls></a-entity>
 
       <!-- Right Hand -->
       <a-entity id="rightHand"
@@ -220,22 +206,23 @@
         drag-pan="rig: #cameraRig">
       </a-entity>
 
-      <!-- Left Hand with wrist menu -->
+      <!-- Left Hand -->
       <a-entity id="leftHand"
         hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
-        super-hands
+        super-hands 
         physics-collider
         collider-check
         oculus-touch-controls="hand: left"
         drag-pan="rig: #cameraRig"
-        wrist-menu="camera: #camera">
+        menu-handler>
+      </a-entity>
 
-        <!-- Wrist Menu -->
-        <a-entity class="menu" visible="false" position="0 0.1 -0.1" rotation="-90 0 0">
-          <a-plane color="#333" width="0.2" height="0.1" opacity="0.9">
-            <a-text value="Menu" align="center" color="#FFF" width="0.2" position="0 0 0.01"></a-text>
-          </a-plane>
-        </a-entity>
+      <!-- Menu plane that will toggle visibility -->
+      <a-entity id="menu" visible="false" position="0 1.5 -1" rotation="0 0 0">
+        <a-plane color="#222" width="1.2" height="0.6" opacity="0.9" position="0 0 0"></a-plane>
+        <a-text value="GIS VR Menu" position="0 0.2 0.01" align="center" color="#FFF" width="1.2"></a-text>
+        <a-text value="Option 1" position="0 0.05 0.01" align="center" color="#FFF" width="1.2"></a-text>
+        <a-text value="Option 2" position="0 -0.1 0.01" align="center" color="#FFF" width="1.2"></a-text>
       </a-entity>
     </a-entity>
   </a-scene>
