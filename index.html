@@ -166,30 +166,6 @@
 
     <a-sky src="#skyTexture" radius="100"></a-sky>
 
-    <!-- Rotatable and scalable group -->
-    <a-entity id="sceneRoot"
-              two-hand-transform="left: #leftHand; right: #rightHand">
-      <a-box 
-        position="-1 1.5 -1" 
-        color="#F44336" 
-        depth="0.5" height="0.5" width="0.5"
-        dynamic-body 
-        grabbable 
-        stretchable 
-        draggable>
-      </a-box>
-
-      <a-sphere 
-        position="1 1.5 -1.5" 
-        color="#4CAF50" 
-        radius="0.3"
-        dynamic-body 
-        grabbable 
-        stretchable 
-        draggable>
-      </a-sphere>
-    </a-entity>
-
     <!-- Camera + Controllers -->
     <a-entity id="cameraRig" position="0 1.6 0">
       <a-entity camera look-controls wasd-controls></a-entity>
@@ -222,6 +198,30 @@
         <a-text value="Option 1" position="0 0.05 0.01" align="center" color="#FFF" width="1.2"></a-text>
         <a-text value="Option 2" position="0 -0.1 0.01" align="center" color="#FFF" width="1.2"></a-text>
       </a-entity>
+    </a-entity>
+
+    <!-- Rotatable and scalable group -->
+    <a-entity id="sceneRoot"
+              two-hand-transform="left: #leftHand; right: #rightHand">
+      <a-box 
+        position="-1 1.5 -1" 
+        color="#F44336" 
+        depth="0.5" height="0.5" width="0.5"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-box>
+
+      <a-sphere 
+        position="1 1.5 -1.5" 
+        color="#4CAF50" 
+        radius="0.3"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-sphere>
     </a-entity>
   </a-scene>
 </body>
