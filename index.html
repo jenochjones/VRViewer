@@ -20,6 +20,12 @@
 
   <!-- Custom drag-pan and two-hand-transform components -->
   <script>
+    // Global grip state for both hands
+    const gripState = {
+      left: false,
+      right: false
+    };
+
     AFRAME.registerComponent('drag-pan', {
       schema: {
         rig: { type: 'selector' }
@@ -28,12 +34,22 @@
         this.grabbing = false;
         this.prevPosition = new THREE.Vector3();
 
+        const isLeft = this.el.id === 'leftHand';
+        const hand = isLeft ? 'left' : 'right';
+        const otherHand = isLeft ? 'right' : 'left';
+
         this.el.addEventListener('gripdown', () => {
-          this.grabbing = true;
-          this.prevPosition.copy(this.el.object3D.position);
+          gripState[hand] = true;
+
+          // Only start grabbing if the other hand is not gripping
+          if (!gripState[otherHand]) {
+            this.grabbing = true;
+            this.prevPosition.copy(this.el.object3D.position);
+          }
         });
 
         this.el.addEventListener('gripup', () => {
+          gripState[hand] = false;
           this.grabbing = false;
         });
       },
@@ -119,7 +135,7 @@
         const deltaRotation = currentRotation - this.initialRotation;
 
         const quaternion = new THREE.Quaternion();
-        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaRotation);
+        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), - deltaRotation);
         this.el.object3D.quaternion.copy(this.startRotation).multiply(quaternion);
 
         // Position (center between hands)
