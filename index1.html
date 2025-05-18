@@ -1,3 +1,6 @@
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,6 +146,60 @@
         this.el.object3D.position.copy(midpoint);
       }
     });
+
+    AFRAME.registerComponent('menu-handler', {
+      init: function () {
+        const menu = document.querySelector('#menu');
+        let menuVisible = false;
+
+        this.el.addEventListener('xbuttondown', () => {
+          menuVisible = !menuVisible;
+          menu.setAttribute('visible', menuVisible);
+        });
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const uploadButton = document.querySelector('#uploadButton');
+      const fileInput = document.querySelector('#geojsonInput');
+
+      uploadButton.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const geojson = JSON.parse(e.target.result);
+          renderGeoJSON(geojson);
+        };
+        reader.readAsText(file);
+      });
+
+      function renderGeoJSON(geojson) {
+        const scene = document.querySelector('a-scene');
+        const group = document.createElement('a-entity');
+        group.setAttribute('id', 'geojson-layer');
+
+        geojson.features.forEach(feature => {
+          if (feature.geometry.type === 'Point') {
+            const [lon, lat] = feature.geometry.coordinates;
+            const entity = document.createElement('a-sphere');
+            entity.setAttribute('radius', 0.1);
+            entity.setAttribute('color', '#FF5722');
+            entity.setAttribute('position', `${lon} 1.6 ${-lat}`); // crude mapping, adjust as needed
+            group.appendChild(entity);
+          }
+          // You can extend this to handle LineString, Polygon, etc.
+        });
+
+        scene.appendChild(group);
+      }
+    });
+
   </script>
 </head>
 <body>
@@ -152,6 +209,42 @@
     </a-assets>
 
     <a-sky src="#skyTexture" radius="100"></a-sky>
+
+    <!-- Camera + Controllers -->
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-entity camera look-controls wasd-controls></a-entity>
+
+      <!-- Right Hand -->
+      <a-entity id="rightHand"
+        hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: right"
+        drag-pan="rig: #cameraRig">
+      </a-entity>
+
+      <!-- Left Hand -->
+      <a-entity id="leftHand"
+        hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: left"
+        drag-pan="rig: #cameraRig"
+        menu-handler>
+      </a-entity>
+
+      <!-- Menu plane that will toggle visibility -->
+      <a-entity id="menu" visible="true" position="0 1.5 -1" rotation="0 0 0">
+        <a-plane color="#222" width="1.2" height="0.6" opacity="0.9" position="0 0 0"></a-plane>
+        <a-text value="Menu" position="0 0.2 0.01" align="center" color="#FFF" width="1.2"></a-text>
+        <a-text id="uploadButton" value="Upload GeoJSON" position="0 0.05 0.01" align="center" color="#00EFFF" width="1.2"
+                class="clickable"></a-text>
+      </a-entity>
+      
+      <!-- Hidden file input -->
+      <input type="file" id="geojsonInput" accept=".geojson,.json" style="display: none;" />
 
     <!-- Rotatable and scalable group -->
     <a-entity id="sceneRoot"
@@ -175,31 +268,6 @@
         stretchable 
         draggable>
       </a-sphere>
-    </a-entity>
-
-    <!-- Camera + Controllers -->
-    <a-entity id="cameraRig" position="0 1.6 0">
-      <a-entity camera look-controls wasd-controls></a-entity>
-
-      <!-- Right Hand -->
-      <a-entity id="rightHand"
-        hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
-        super-hands 
-        physics-collider
-        collider-check
-        oculus-touch-controls="hand: right"
-        drag-pan="rig: #cameraRig">
-      </a-entity>
-
-      <!-- Left Hand -->
-      <a-entity id="leftHand"
-        hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
-        super-hands 
-        physics-collider
-        collider-check
-        oculus-touch-controls="hand: left"
-        drag-pan="rig: #cameraRig">
-      </a-entity>
     </a-entity>
   </a-scene>
 </body>
