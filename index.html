@@ -143,6 +143,34 @@
         this.el.object3D.position.copy(midpoint);
       }
     });
+
+    AFRAME.registerComponent('wrist-menu', {
+      schema: {
+        camera: { type: 'selector' },
+        threshold: { type: 'number', default: 0.8 } // cosine of angle (~36°)
+      },
+      init: function () {
+        this.menu = this.el.querySelector('.menu');
+        this.cameraEl = this.data.camera;
+      },
+      tick: function () {
+        if (!this.menu || !this.cameraEl) return;
+
+        const wristWorldPos = new THREE.Vector3();
+        const cameraWorldPos = new THREE.Vector3();
+        const cameraDir = new THREE.Vector3();
+
+        this.el.object3D.getWorldPosition(wristWorldPos);
+        this.cameraEl.object3D.getWorldPosition(cameraWorldPos);
+        this.cameraEl.object3D.getWorldDirection(cameraDir);
+
+        const toWrist = wristWorldPos.clone().sub(cameraWorldPos).normalize();
+        const dot = cameraDir.dot(toWrist);
+
+        const looking = dot > this.data.threshold;
+        this.menu.setAttribute('visible', looking);
+      }
+    });
   </script>
 </head>
 <body>
@@ -191,14 +219,22 @@
         drag-pan="rig: #cameraRig">
       </a-entity>
 
-      <!-- Left Hand -->
+      <!-- Left Hand with wrist menu -->
       <a-entity id="leftHand"
         hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
-        super-hands 
+        super-hands
         physics-collider
         collider-check
         oculus-touch-controls="hand: left"
-        drag-pan="rig: #cameraRig">
+        drag-pan="rig: #cameraRig"
+        wrist-menu="camera: #camera">
+
+        <!-- Wrist Menu -->
+        <a-entity class="menu" visible="false" position="0 0.1 -0.1" rotation="-90 0 0">
+          <a-plane color="#333" width="0.2" height="0.1" opacity="0.9">
+            <a-text value="Menu" align="center" color="#FFF" width="0.2" position="0 0 0.01"></a-text>
+          </a-plane>
+        </a-entity>
       </a-entity>
     </a-entity>
   </a-scene>

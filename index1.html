@@ -2,187 +2,205 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>WebXR VR Room with Controllers</title>
+  <title>GIS VR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- A-Frame core -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+  <!-- Super Hands for interaction -->
+  <script src="https://unpkg.com/aframe-super-hands-component@5.0.1/dist/aframe-super-hands-component.min.js"></script>
+
   <style>
     body {
       margin: 0;
       overflow: hidden;
     }
-    canvas {
-      display: block;
-    }
   </style>
+
+  <!-- Custom drag-pan and two-hand-transform components -->
+  <script>
+    // Global grip state for both hands
+    const gripState = {
+      left: false,
+      right: false
+    };
+
+    AFRAME.registerComponent('drag-pan', {
+      schema: {
+        rig: { type: 'selector' }
+      },
+      init: function () {
+        this.grabbing = false;
+        this.prevPosition = new THREE.Vector3();
+
+        const isLeft = this.el.id === 'leftHand';
+        const hand = isLeft ? 'left' : 'right';
+        const otherHand = isLeft ? 'right' : 'left';
+
+        this.el.addEventListener('gripdown', () => {
+          gripState[hand] = true;
+
+          // Only start grabbing if the other hand is not gripping
+          if (!gripState[otherHand]) {
+            this.grabbing = true;
+            this.prevPosition.copy(this.el.object3D.position);
+          }
+        });
+
+        this.el.addEventListener('gripup', () => {
+          gripState[hand] = false;
+          this.grabbing = false;
+        });
+      },
+      tick: function () {
+        if (!this.grabbing) return;
+
+        const currentPosition = this.el.object3D.position;
+        const delta = new THREE.Vector3().subVectors(currentPosition, this.prevPosition);
+
+        this.data.rig.object3D.position.sub(delta);
+        this.prevPosition.copy(currentPosition);
+      }
+    });
+
+    AFRAME.registerComponent('two-hand-transform', {
+      schema: {
+        left: { type: 'selector' },
+        right: { type: 'selector' }
+      },
+      init: function () {
+        this.active = false;
+        this.initialDistance = 0;
+        this.initialRotation = 0;
+        this.initialScale = this.el.object3D.scale.clone();
+        this.initialMidpoint = new THREE.Vector3();
+        this.startRotation = new THREE.Quaternion();
+
+        this.leftGrabbing = false;
+        this.rightGrabbing = false;
+
+        this.data.left.addEventListener('gripdown', () => {
+          this.leftGrabbing = true;
+          this.tryStart();
+        });
+        this.data.right.addEventListener('gripdown', () => {
+          this.rightGrabbing = true;
+          this.tryStart();
+        });
+
+        this.data.left.addEventListener('gripup', () => {
+          this.leftGrabbing = false;
+          this.active = false;
+        });
+        this.data.right.addEventListener('gripup', () => {
+          this.rightGrabbing = false;
+          this.active = false;
+        });
+      },
+      tryStart: function () {
+        if (this.leftGrabbing && this.rightGrabbing) {
+          const leftPos = this.data.left.object3D.position;
+          const rightPos = this.data.right.object3D.position;
+
+          this.initialDistance = leftPos.distanceTo(rightPos);
+          this.initialMidpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+          this.initialScale = this.el.object3D.scale.clone();
+          this.startRotation.copy(this.el.object3D.quaternion);
+
+          const dir = new THREE.Vector3().subVectors(rightPos, leftPos).normalize();
+          this.initialRotation = Math.atan2(dir.z, dir.x);
+
+          this.active = true;
+        }
+      },
+      tick: function () {
+        if (!this.active) return;
+
+        const leftPos = this.data.left.object3D.position;
+        const rightPos = this.data.right.object3D.position;
+
+        // Scaling
+        const currentDistance = leftPos.distanceTo(rightPos);
+        const scaleFactor = currentDistance / this.initialDistance;
+        this.el.object3D.scale.set(
+          this.initialScale.x * scaleFactor,
+          this.initialScale.y * scaleFactor,
+          this.initialScale.z * scaleFactor
+        );
+
+        // Rotation
+        const dir = new THREE.Vector3().subVectors(rightPos, leftPos).normalize();
+        const currentRotation = Math.atan2(dir.z, dir.x);
+        const deltaRotation = currentRotation - this.initialRotation;
+
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), - deltaRotation);
+        this.el.object3D.quaternion.copy(this.startRotation).multiply(quaternion);
+
+        // Position (center between hands)
+        const midpoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+        this.el.object3D.position.copy(midpoint);
+      }
+    });
+  </script>
 </head>
 <body>
-<script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.156.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.156.0/examples/jsm/",
-      "vrButton": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/VRButton.js",
-      "controllerFactory": "https://unpkg.com/three@0.156.0/examples/jsm/webxr/XRControllerModelFactory.js"
-    }
-  }
-</script>
-<script type="module">
-  import * as THREE from 'three';
-  import { VRButton } from 'vrButton';
-  import { XRControllerModelFactory } from 'controllerFactory';
+  <a-scene physics="gravity: -9.8" background="color: #87CEFA">
+    <a-assets>
+      <img id="skyTexture" src="public/images/sky.png">
+    </a-assets>
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x202030);
+    <a-sky src="#skyTexture" radius="100"></a-sky>
 
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 1, 3);
+    <!-- Rotatable and scalable group -->
+    <a-entity id="sceneRoot"
+              two-hand-transform="left: #leftHand; right: #rightHand">
+      <a-box 
+        position="-1 1.5 -1" 
+        color="#F44336" 
+        depth="0.5" height="0.5" width="0.5"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-box>
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
-  document.body.appendChild(VRButton.createButton(renderer));
+      <a-sphere 
+        position="1 1.5 -1.5" 
+        color="#4CAF50" 
+        radius="0.3"
+        dynamic-body 
+        grabbable 
+        stretchable 
+        draggable>
+      </a-sphere>
+    </a-entity>
 
-  // Static room
-  const room = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 3, 6),
-    new THREE.MeshBasicMaterial({ color: 0x404040, side: THREE.BackSide })
-  );
-  room.position.y = -1.5;
-  scene.add(room);
+    <!-- Camera + Controllers -->
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-entity camera look-controls wasd-controls></a-entity>
 
-  // Movable scene content
-  const sceneGroup = new THREE.Group();
-  scene.add(sceneGroup);
+      <!-- Right Hand -->
+      <a-entity id="rightHand"
+        hand-controls="hand: right; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: right"
+        drag-pan="rig: #cameraRig">
+      </a-entity>
 
-  // Light and floating cube
-  const light = new THREE.HemisphereLight(0xffffff, 0x444444);
-  light.position.set(0, 1, 0);
-  sceneGroup.add(light);
-
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(0.3, 0.3, 0.3),
-    new THREE.MeshStandardMaterial({ color: 0x00ffcc })
-  );
-  cube.position.set(0, 1.6, -1);
-  sceneGroup.add(cube);
-
-  // Controllers and models
-  const controllerModelFactory = new XRControllerModelFactory();
-
-  const controller1 = renderer.xr.getController(0);
-  const controller2 = renderer.xr.getController(1);
-  scene.add(controller1, controller2);
-
-  const controllerGrip1 = renderer.xr.getControllerGrip(0);
-  controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-  scene.add(controllerGrip1);
-
-  const controllerGrip2 = renderer.xr.getControllerGrip(1);
-  controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-  scene.add(controllerGrip2);
-
-  // Track grab states
-  let controllerStates = {
-    left: {
-      controller: controller1,
-      isGrabbing: false,
-      lastPos: new THREE.Vector3()
-    },
-    right: {
-      controller: controller2,
-      isGrabbing: false,
-      lastPos: new THREE.Vector3()
-    }
-  };
-
-  // Initial values for scaling/rotation
-  let initialMidpoint = new THREE.Vector3();
-  let initialDir = new THREE.Vector3();
-  let initialScale = 1;
-  let initialRotation = new THREE.Quaternion();
-  let initialScenePosition = new THREE.Vector3();
-
-  function onBothGrabStart() {
-    const pos1 = controllerStates.left.controller.position;
-    const pos2 = controllerStates.right.controller.position;
-
-    initialMidpoint.copy(pos1).add(pos2).multiplyScalar(0.5);
-    initialDir.subVectors(pos2, pos1).normalize();
-    initialScale = sceneGroup.scale.x;
-    initialRotation.copy(sceneGroup.quaternion);
-    initialScenePosition.copy(sceneGroup.position);
-  }
-
-  controller1.addEventListener('squeezestart', () => {
-    controllerStates.left.isGrabbing = true;
-    controllerStates.left.lastPos.copy(controller1.position);
-    if (controllerStates.right.isGrabbing) onBothGrabStart();
-  });
-
-  controller1.addEventListener('squeezeend', () => {
-    controllerStates.left.isGrabbing = false;
-  });
-
-  controller2.addEventListener('squeezestart', () => {
-    controllerStates.right.isGrabbing = true;
-    controllerStates.right.lastPos.copy(controller2.position);
-    if (controllerStates.left.isGrabbing) onBothGrabStart();
-  });
-
-  controller2.addEventListener('squeezeend', () => {
-    controllerStates.right.isGrabbing = false;
-  });
-
-  // Animation loop
-  renderer.setAnimationLoop(() => {
-    const left = controllerStates.left;
-    const right = controllerStates.right;
-
-    const bothGrabbing = left.isGrabbing && right.isGrabbing;
-    const oneGrabbing = (left.isGrabbing && !right.isGrabbing) || (!left.isGrabbing && right.isGrabbing);
-
-    // Panning with one hand
-    if (oneGrabbing) {
-      const active = left.isGrabbing ? left : right;
-      const delta = new THREE.Vector3().subVectors(active.controller.position, active.lastPos);
-      sceneGroup.position.add(delta);
-      active.lastPos.copy(active.controller.position);
-    }
-
-    // Zoom and rotate with both hands
-    if (bothGrabbing) {
-      const pos1 = left.controller.position;
-      const pos2 = right.controller.position;
-
-      const currentMid = new THREE.Vector3().addVectors(pos1, pos2).multiplyScalar(0.5);
-      const currentDir = new THREE.Vector3().subVectors(pos2, pos1).normalize();
-
-      // Scale
-      const currentDistance = pos1.distanceTo(pos2);
-
-      const initialDistance = initialDir.length(); // store at grab time
-      const scaleFactor = currentDistance / initialDistance;
-
-      const newScale = THREE.MathUtils.clamp(initialScale * scaleFactor, 0.1, 10);
-      sceneGroup.scale.setScalar(newScale);
-
-      // Rotation
-      const rotationQuat = new THREE.Quaternion().setFromUnitVectors(initialDir, currentDir);
-      const newRotation = initialRotation.clone().multiply(rotationQuat);
-      sceneGroup.quaternion.copy(newRotation);
-
-      // Position adjustment to maintain controller anchors
-      const rotatedOffset = new THREE.Vector3().subVectors(currentMid, initialMidpoint).applyQuaternion(rotationQuat);
-      sceneGroup.position.copy(initialScenePosition.clone().add(rotatedOffset));
-    }
-
-    renderer.render(scene, camera);
-  });
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-</script>
+      <!-- Left Hand -->
+      <a-entity id="leftHand"
+        hand-controls="hand: left; handModelStyle: lowPoly; color: #fff"
+        super-hands 
+        physics-collider
+        collider-check
+        oculus-touch-controls="hand: left"
+        drag-pan="rig: #cameraRig">
+      </a-entity>
+    </a-entity>
+  </a-scene>
 </body>
 </html>
